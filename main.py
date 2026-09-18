@@ -288,6 +288,12 @@ async def admin_lock():
 async def admin_status():
     return {"dry_run": DRY_RUN, "prod_unlocked": PROD_UNLOCKED, "allowlist": sorted(ALLOWLIST)}
 
+@app.get("/debug/workspace")
+def debug_workspace():
+    ws = workspace_path("leads/pipeline.md")
+    return {"workspace": str(ws), "existe": ws.exists(), "tamanho": ws.stat().st_size if ws.exists() else 0,
+            "dry_run": DRY_RUN, "prod_unlocked": PROD_UNLOCKED}
+
 @app.post("/admin/flush")
 async def admin_flush(request: Request):
     """Fila processa imediatamente (debug)."""
