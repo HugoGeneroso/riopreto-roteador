@@ -4,7 +4,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY main.py .
 COPY zai_respond.py .
-COPY data/ /data/agencia-riopreto/leads/
+COPY data/leads/ /data/agencia-riopreto/leads/
 ENV SOULS_DIR=/app/souls
 ENV WORKSPACE=/data/agencia-riopreto
 EXPOSE 8080
