@@ -249,7 +249,7 @@ async def webhook(request: Request):
             continue
         seen_ids.add(msg_id)
         # só mensagens de texto RECEBIDAS (não fromMe), sem grupo
-        if msg.get("fromMe") or msg.get("isGroup") or ev.get("event") not in (None, "messages.upsert"):
+        if msg.get("fromMe") or msg.get("isGroup") or str(ev.get("event","")).replace("_", ".") not in ("None", "messages.upsert", "messages.update", "messages.update"):
             continue
         chatid = str(msg.get("chatid") or msg.get("remoteJid") or "").split("@")[0].replace("+", "")
         content = msg.get("content", {})
