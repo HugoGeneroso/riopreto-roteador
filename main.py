@@ -63,7 +63,7 @@ def crm_append(chatid: str, role: str, text: str):
     p = workspace_path("leads/crm-log.md")
     try:
         with p.open("a", encoding="utf-8") as f:
-            f.write(f"- {datetime.now():%d/%m %H:%M} [{role}] {chatid}: {sanitize_text(text, 150)}\n")
+            f.write(f"- {datetime.now():%d/%m %H:%M} [{role}] {chatid}: {sanitize_text(text, 400)}\n")
     except Exception:
         pass
 
