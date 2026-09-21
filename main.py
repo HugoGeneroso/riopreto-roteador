@@ -276,6 +276,9 @@ async def webhook(request: Request):
     results = []
     for ev in events:
         data = ev.get("data", ev)
+        # payload UazAPI real: {EventType, event: {chatid, message: {key, message...}}}
+        if isinstance(ev, dict) and isinstance(ev.get("event"), dict):
+            data = ev["event"]
         msg = data.get("message", data) if isinstance(data, dict) else {}
         msg_id = str(msg.get("id", data.get("id", "")) or data.get("key", {}).get("id", "") or "") or hashlib.md5(json.dumps(ev, sort_keys=True).encode()).hexdigest()[:16]
         if msg_id in seen_ids:
@@ -284,9 +287,30 @@ async def webhook(request: Request):
         # só mensagens de texto RECEBIDAS (não fromMe), sem grupo
         if msg.get("fromMe") or msg.get("isGroup") or str(ev.get("event", "")).replace("_", ".") not in ("None", "messages", "messages.upsert", "messages.update", "messages.update"):
             continue
-        chatid = str(msg.get("chatid") or msg.get("remoteJid") or "").split("@")[0].replace("+", "")
+        def _dig(d, *keys, depth=0):
+            if depth > 5 or not isinstance(d, dict):
+                return None
+            for k in keys:
+                v = d.get(k)
+                if isinstance(v, str) and v:
+                    return v
+            for v in d.values():
+                f = _dig(v, *keys, depth=depth + 1)
+                if f:
+                    return f
+            return None
+        chatid = str(msg.get("chatid") or msg.get("remoteJid") or data.get("chatid")
+                     or data.get("wa_chatid") or "").split("@")[0].replace("+", "")
         content = msg.get("content", {})
         text = content.get("text") if isinstance(content, dict) else None
+        if not text:
+            # formato Baileys: message.conversation | message.extendedTextMessage.text
+            m2 = msg.get("message") if isinstance(msg, dict) else None
+            if isinstance(m2, dict):
+                text = (m2.get("conversation")
+                        or (m2.get("extendedTextMessage") or {}).get("text"))
+            if not text:
+                text = _dig(data, "conversation", "text")
         if not chatid or not text:
             continue
         text = sanitize_text(text)
