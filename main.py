@@ -285,7 +285,8 @@ async def webhook(request: Request):
             continue
         seen_ids.add(msg_id)
         # só mensagens de texto RECEBIDAS (não fromMe), sem grupo
-        if msg.get("fromMe") or msg.get("isGroup") or str(ev.get("event", "")).replace("_", ".") not in ("None", "messages", "messages.upsert", "messages.update", "messages.update"):
+        ev_name = ev.get("EventType") or (ev.get("event") if isinstance(ev.get("event"), str) else None) or ""
+        if msg.get("fromMe") or msg.get("IsFromMe") or msg.get("isGroup") or str(ev_name).replace("_", ".") not in ("None", "", "messages", "messages.upsert", "messages.update", "messages.update"):
             continue
         def _dig(d, *keys, depth=0):
             if depth > 5 or not isinstance(d, dict):
