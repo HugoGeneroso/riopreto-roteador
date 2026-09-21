@@ -288,6 +288,25 @@ async def admin_lock():
 async def admin_status():
     return {"dry_run": DRY_RUN, "prod_unlocked": PROD_UNLOCKED, "allowlist": sorted(ALLOWLIST)}
 
+@app.get("/admin/log")
+def admin_log(n: int = 30):
+    """Últimas N linhas do crm-log do container (auditoria sem ssh)."""
+    p = workspace_path("leads/crm-log.md")
+    try:
+        lines = p.read_text(encoding="utf-8").splitlines()
+        return {"linhas": lines[-n:], "total": len(lines)}
+    except Exception as e:
+        return {"linhas": [], "erro": str(e)}
+
+@app.get("/admin/conv")
+def admin_conv(chatid: str = ""):
+    """Memórias de conversa ativas (debug de contexto)."""
+    from zai_respond import _CONVS, conv_clear
+    if chatid:
+        conv_clear(chatid)
+        return {"limpo": chatid}
+    return {cid: len(h) for cid, h in _CONVS.items()}
+
 @app.get("/debug/workspace")
 def debug_workspace():
     ws = workspace_path("leads/pipeline.md")
