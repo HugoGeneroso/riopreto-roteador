@@ -38,6 +38,7 @@ app = FastAPI(title="Rio Preto Tech - Roteador WhatsApp")
 
 # ---------- estado em memória ----------
 seen_ids = set()                     # dedup de eventos
+TREINO_ATIVO = {}                    # chats do Hugo em modo treino persistente
 last_reply_epoch = {}                # chatid -> epoch última resposta
 pending_queue = deque()              # mensagens fora de horário (respondem às 9h)
 send_lock = threading.Lock()
@@ -193,13 +194,26 @@ def process(chatid: str, msg_id: str, text: str):
 def _process_inner(chatid: str, msg_id: str, text: str):
     profile = route_for(chatid)
     if profile == "treino-closer":
-        # Mensagem do Hugo: se começa com [TREINO], o closer responde como se
-        # Hugo fosse o cliente (simulação). Senão, é comando — ignora.
-        if not text.upper().startswith("[TREINO]"):
+        # Modo treino: inicia com [TREINO] e PERMANECE ativo (memória de sessão)
+        # até [FIM-TREINO]. Demais msgs do Hugo entram na conversa em andamento.
+        global TREINO_ATIVO
+        upper = text.upper()
+        if TREINO_ATIVO.get(chatid):
+            if "[FIM-TREINO]" in upper:
+                TREINO_ATIVO.pop(chatid, None)
+                from zai_respond import conv_clear
+                conv_clear(chatid)
+                crm_append(chatid, "TREINO-ENCERRADO", text)
+                return
+            profile = "closer"
+            text = text.strip()
+        elif upper.startswith("[TREINO]"):
+            TREINO_ATIVO[chatid] = True
+            profile = "closer"
+            text = text[len("[TREINO]"):].strip() or "oi"
+        else:
             crm_append(chatid, "COMANDO-HUGO", text)
             return
-        profile = "closer"
-        text = text[len("[TREINO]"):].strip() or "oi"
     if profile is None:
         crm_append(chatid, "IGNORADA", text)
         return
