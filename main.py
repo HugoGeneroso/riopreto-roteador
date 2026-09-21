@@ -246,8 +246,8 @@ def _process_inner(chatid: str, msg_id: str, text: str):
     if profile is None:
         crm_append(chatid, "IGNORADA", text)
         return
-    # fora do horário: enfileira pra 9h
-    if not (HORARIO_INI <= now_hour() < HORARIO_FIM):
+    # fora do horário: enfileira pra 9h (treino com o Hugo ignora horário)
+    if not TREINO_ATIVO.get(chatid) and not (HORARIO_INI <= now_hour() < HORARIO_FIM):
         pending_queue.append({"chatid": chatid, "msg": text, "profile": profile, "ts": time.time()})
         crm_append(chatid, "FILHADA (fora de horário)", text)
         return
