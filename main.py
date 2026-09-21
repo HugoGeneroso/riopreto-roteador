@@ -269,7 +269,7 @@ async def webhook(request: Request):
 
     # DEBUG: log bruto de todo payload recebido (ver formato real da UazAPI)
     import sys
-    print("[WEBHOOK-PAYLOAD]", json.dumps(payload, ensure_ascii=False)[:1500], flush=True)
+    print("[WEBHOOK-PAYLOAD]", json.dumps(payload, ensure_ascii=False)[:6000], flush=True)
 
     # UazAPI muda o formato; extrair campos de forma tolerante
     events = payload if isinstance(payload, list) else [payload]
