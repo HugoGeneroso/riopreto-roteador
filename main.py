@@ -266,13 +266,17 @@ async def webhook(request: Request):
     except Exception:
         raise HTTPException(400, "json inválido")
 
+    # DEBUG: log bruto de todo payload recebido (ver formato real da UazAPI)
+    import sys
+    print("[WEBHOOK-PAYLOAD]", json.dumps(payload, ensure_ascii=False)[:1500], flush=True)
+
     # UazAPI muda o formato; extrair campos de forma tolerante
     events = payload if isinstance(payload, list) else [payload]
     results = []
     for ev in events:
         data = ev.get("data", ev)
         msg = data.get("message", data) if isinstance(data, dict) else {}
-        msg_id = str(msg.get("id", data.get("id", ""))) or hashlib.md5(json.dumps(ev, sort_keys=True).encode()).hexdigest()[:16]
+        msg_id = str(msg.get("id", data.get("id", "")) or data.get("key", {}).get("id", "") or "") or hashlib.md5(json.dumps(ev, sort_keys=True).encode()).hexdigest()[:16]
         if msg_id in seen_ids:
             continue
         seen_ids.add(msg_id)
