@@ -173,6 +173,15 @@ def send_whatsapp(chatid: str, text: str) -> bool:
 
 # ---------- processamento ----------
 def process(chatid: str, msg_id: str, text: str):
+    try:
+        _process_inner(chatid, msg_id, text)
+    except Exception as e:
+        import traceback, sys
+        traceback.print_exc()
+        print(f"[ERRO-PROCESS] {chatid}: {e}", flush=True)
+        crm_append(chatid, "ERRO-PROCESS", f"{e}")
+
+def _process_inner(chatid: str, msg_id: str, text: str):
     profile = route_for(chatid)
     if profile == "treino-closer":
         # Mensagem do Hugo: se começa com [TREINO], o closer responde como se
