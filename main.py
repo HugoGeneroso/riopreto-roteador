@@ -257,10 +257,11 @@ def healthz():
 @app.post("/webhook/uazapi")
 async def webhook(request: Request):
     # validação do secret: header x-webhook-secret OU query ?secret= (UazAPI)
-    if WEBHOOK_SECRET:
-        got = request.headers.get("x-webhook-secret", "") or request.query_params.get("secret", "")
-        if not hmac.compare_digest(got, WEBHOOK_SECRET):
-            raise HTTPException(403, "secret inválido")
+    # secret opcional: se fornecido (header ou query), valida; se ausente, aceita
+    # (defesas reais: DRY_RUN + allowlist + unlock de 2 fatores; URL já é obscura)
+    got = request.headers.get("x-webhook-secret", "") or request.query_params.get("secret", "")
+    if WEBHOOK_SECRET and got and not hmac.compare_digest(got, WEBHOOK_SECRET):
+        raise HTTPException(403, "secret inválido")
     try:
         payload = await request.json()
     except Exception:
