@@ -57,9 +57,16 @@ def sanitize_text(s: str, limit: int = 1200) -> str:
 def load_pipeline() -> str:
     p = workspace_path("leads/pipeline.md")
     try:
-        return p.read_text(encoding="utf-8")[:6000]
+        t = p.read_text(encoding="utf-8")
     except Exception:
         return "(pipeline indisponível)"
+    # prioriza leads quentes: linhas com estágio avançado primeiro, depois o resto
+    lines = t.split("\n")
+    hot = [l for l in lines if any(k in l.lower() for k in
+        ["negociando", "prototipo-pronto", "contato-feito", "review w"])]
+    rest = [l for l in lines if l not in hot]
+    out = "\n".join(hot) + "\n---\n" + "\n".join(rest)
+    return out[:6000]
 
 def crm_append(chatid: str, role: str, text: str):
     p = workspace_path("leads/crm-log.md")
