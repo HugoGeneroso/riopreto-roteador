@@ -54,7 +54,7 @@ def zai_respond(profile: str, chatid: str, msg: str, pipeline_ctx: str = "") -> 
             or_key = os.getenv("OPENROUTER_API_KEY", "")
             if not or_key:
                 raise RuntimeError(f"zai_respond falhou (sem fallback): {last_err}")
-            url, hdr_auth, model = "https://openrouter.ai/api/v1/chat/completions", f"Bearer {or_key}", "z-ai/glm-4.5-flash"
+            url, hdr_auth, model = "https://openrouter.ai/api/v1/chat/completions", f"Bearer {or_key}", "z-ai/glm-5.3-flash"
         body = json.dumps({"model": model, "messages": messages}).encode("utf-8")
         req = urllib.request.Request(url, data=body, headers={
             "Authorization": hdr_auth, "Content-Type": "application/json"})
