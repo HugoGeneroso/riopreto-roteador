@@ -146,6 +146,30 @@ def hermes_respond(profile: str, chatid: str, msg: str) -> str | None:
 # ---------- envio ----------
 PROD_UNLOCKED = False  # só vira True via /admin/unlock com PROD_UNLOCK_KEY
 
+def uazapi_post(path: str, body: dict) -> bool:
+    """POST auxiliar para endpoints da UazAPI (markread, presence)."""
+    import urllib.request
+    try:
+        req = urllib.request.Request(
+            f"{UAZAPI_URL}{path}", data=json.dumps(body).encode("utf-8"),
+            headers={"token": UAZAPI_TOKEN, "Content-Type": "application/json; charset=utf-8"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return 200 <= resp.status < 300
+    except Exception:
+        return False
+
+def mark_read(wa_msg_ids: list):
+    """Marca mensagens como lidas (check azul) — melhor esforço."""
+    if wa_msg_ids:
+        uazapi_post("/message/markread", {"id": wa_msg_ids})
+
+def send_typing(chatid: str, delay_ms: int = 60000):
+    """Ativa 'digitando...' no chat (auto-cancela ao enviar mensagem)."""
+    uazapi_post("/message/presence", {"number": chatid, "presence": "composing", "delay": delay_ms})
+
+def stop_typing(chatid: str):
+    uazapi_post("/message/presence", {"number": chatid, "presence": "paused"})
+
 def send_whatsapp(chatid: str, text: str) -> bool:
     """Envio com trava de segurança (pós-incidente 17/09).
     DRY_RUN=1 (default): NENHUM envio real — tudo é redirecionado pro Hugo
@@ -178,17 +202,22 @@ def send_whatsapp(chatid: str, text: str) -> bool:
             ok = b'"id"' in resp.read()
     except Exception:
         ok = False
+    if ok:
+        stop_typing(chatid)  # resposta enviada: para o 'digitando...'
     crm_append(chatid, "ROTEADOR→" + ("OK" if ok else "ERRO") + (f" →{target}" if target != chatid else ""), text)
     return ok
 
 # ---------- processamento ----------
-def process(chatid: str, msg_id: str, text: str):
+def process(chatid: str, msg_id: str, text: str, wa_msg_id: str = ""):
     try:
+        mark_read([wa_msg_id] if wa_msg_id else [])
+        send_typing(chatid)
         _process_inner(chatid, msg_id, text)
     except Exception as e:
         import traceback, sys
         traceback.print_exc()
         print(f"[ERRO-PROCESS] {chatid}: {e}", flush=True)
+        stop_typing(chatid)
         crm_append(chatid, "ERRO-PROCESS", f"{e}")
 
 def _process_inner(chatid: str, msg_id: str, text: str):
@@ -331,8 +360,14 @@ async def webhook(request: Request):
         text = sanitize_text(text)
         if not text:
             continue
+        # id real da mensagem no WhatsApp (p/ marcar como lida)
+        wa_msg_id = ""
+        try:
+            wa_msg_id = (msg.get("key") or {}).get("id", "") or data.get("key", {}).get("id", "")
+        except Exception:
+            pass
         # processa em thread própria (responde rápido ao webhook)
-        threading.Thread(target=process, args=(chatid, msg_id, text), daemon=True).start()
+        threading.Thread(target=process, args=(chatid, msg_id, text, wa_msg_id), daemon=True).start()
         results.append({"msg_id": msg_id, "queued": True})
     return JSONResponse({"received": len(results)})
 
