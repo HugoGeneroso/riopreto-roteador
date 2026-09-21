@@ -47,7 +47,9 @@ def workspace_path(rel: str) -> Path:
 
 # ---------- utilitários ----------
 def now_hour():
-    return datetime.now().hour
+    # horário de Brasília (o container roda em UTC)
+    from zoneinfo import ZoneInfo
+    return datetime.now(ZoneInfo("America/Sao_Paulo")).hour
 
 def sanitize_text(s: str, limit: int = 1200) -> str:
     return re.sub(r"\s+", " ", (s or "")).strip()[:limit]
