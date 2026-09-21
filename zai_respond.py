@@ -40,20 +40,33 @@ def zai_respond(profile: str, chatid: str, msg: str, pipeline_ctx: str = "") -> 
     )
     messages = [{"role": "system", "content": system}] + conv_history(chatid)
     messages.append({"role": "user", "content": f"Mensagem do cliente: {msg}"})
-    body = json.dumps({
-        "model": "glm-5.3-flash",
-        "messages": messages,
-        "thinking": {"type": "enabled"},
-    }).encode("utf-8")
-    req = urllib.request.Request(ZAI_API, data=body, headers={
-        "Authorization": f"Bearer {key}", "Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=120) as r:
-            d = json.loads(r.read())
-        reply = d["choices"][0]["message"]["content"].strip()[:1500]
-        if reply:
-            conv_append(chatid, "user", f"Mensagem do cliente: {msg}")
-            conv_append(chatid, "assistant", reply)
-        return reply or None
-    except Exception as e:
-        raise RuntimeError(f"zai_respond falhou: {e}") from e
+
+    last_err = None
+    # Tentativa 1: z.ai direto · Tentativa 2: retry z.ai (30s, para 429) · Tentativa 3: OpenRouter
+    for attempt in range(3):
+        if attempt == 0:
+            url, hdr_auth, model = ZAI_API, f"Bearer {key}", "glm-5.3-flash"
+        elif attempt == 1:
+            import time as _t
+            _t.sleep(30)
+            url, hdr_auth, model = ZAI_API, f"Bearer {key}", "glm-5.3-flash"
+        else:
+            or_key = os.getenv("OPENROUTER_API_KEY", "")
+            if not or_key:
+                raise RuntimeError(f"zai_respond falhou (sem fallback): {last_err}")
+            url, hdr_auth, model = "https://openrouter.ai/api/v1/chat/completions", f"Bearer {or_key}", "z-ai/glm-4.5-flash"
+        body = json.dumps({"model": model, "messages": messages}).encode("utf-8")
+        req = urllib.request.Request(url, data=body, headers={
+            "Authorization": hdr_auth, "Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=120) as r:
+                d = json.loads(r.read())
+            reply = (d["choices"][0]["message"]["content"] or "").strip()[:1500]
+            if reply:
+                conv_append(chatid, "user", f"Mensagem do cliente: {msg}")
+                conv_append(chatid, "assistant", reply)
+            return reply or None
+        except Exception as e:
+            last_err = e
+            continue
+    raise RuntimeError(f"zai_respond falhou (3 tentativas): {last_err}") from last_err
