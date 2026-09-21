@@ -87,7 +87,9 @@ def is_authorized_lead(chatid: str) -> bool:
 def route_for(chatid: str) -> str | None:
     """Retorna o profile Hermes que responde este chat, ou None para ignorar."""
     if chatid.replace("+", "") == HUGO_WA:
-        return None  # mensagens do Hugo não geram resposta automática (ele comanda direto)
+        # Treino: mensagens do Hugo com marcador [TREINO] são roteadas pro closer.
+        # Demais mensagens do Hugo são comando direto (sem resposta automática).
+        return "treino-closer"
     if not is_authorized_lead(chatid):
         return None  # desconhecido: ignorar (anti-spam; leads só por lote autorizado)
     try:
@@ -172,6 +174,14 @@ def send_whatsapp(chatid: str, text: str) -> bool:
 # ---------- processamento ----------
 def process(chatid: str, msg_id: str, text: str):
     profile = route_for(chatid)
+    if profile == "treino-closer":
+        # Mensagem do Hugo: se começa com [TREINO], o closer responde como se
+        # Hugo fosse o cliente (simulação). Senão, é comando — ignora.
+        if not text.upper().startswith("[TREINO]"):
+            crm_append(chatid, "COMANDO-HUGO", text)
+            return
+        profile = "closer"
+        text = text[len("[TREINO]"):].strip() or "oi"
     if profile is None:
         crm_append(chatid, "IGNORADA", text)
         return
