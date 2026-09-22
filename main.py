@@ -366,6 +366,13 @@ async def webhook(request: Request):
             wa_msg_id = (msg.get("key") or {}).get("id", "") or data.get("key", {}).get("id", "")
         except Exception:
             pass
+        # payload UazAPI real: id/messageid planos (ex.: "3EB0..."), não em key
+        if not wa_msg_id:
+            wa_msg_id = (msg.get("messageid") or data.get("messageid")
+                         or msg.get("id") or data.get("id") or "")
+            # remove prefixo "owner:" se vier junto ("5517...:3EB0...")
+            if ":" in str(wa_msg_id):
+                wa_msg_id = str(wa_msg_id).split(":")[-1]
         # processa em thread própria (responde rápido ao webhook)
         threading.Thread(target=process, args=(chatid, msg_id, text, wa_msg_id), daemon=True).start()
         results.append({"msg_id": msg_id, "queued": True})
