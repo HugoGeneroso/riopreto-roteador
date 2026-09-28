@@ -71,6 +71,9 @@ def load_pipeline() -> str:
 
 def crm_append(chatid: str, role: str, text: str):
     p = workspace_path("leads/crm-log.md")
+    if not p.exists():
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
     try:
         with p.open("a", encoding="utf-8") as f:
             f.write(f"- {datetime.now():%d/%m %H:%M} [{role}] {chatid}: {sanitize_text(text, 400)}\n")
