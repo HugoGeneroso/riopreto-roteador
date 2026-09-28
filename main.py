@@ -177,6 +177,21 @@ def send_typing(chatid: str, delay_ms: int = 60000):
 def stop_typing(chatid: str):
     uazapi_post("/message/presence", {"number": chatid, "presence": "paused"})
 
+def send_menu(chatid: str, title: str, choices: list, footer: str = "", delay_ms: int = 1500) -> bool:
+    """Menu interativo de botões — UazAPI /send/menu. choices: ["Texto|id", ...]."""
+    bodyd = {"number": chatid, "type": "button", "text": title, "choices": choices,
+             "delay": delay_ms, "readmessages": True}
+    if footer:
+        bodyd["footerText"] = footer
+    return uazapi_post("/send/menu", bodyd)
+
+def send_pix_button(chatid: str, pix_name: str, pix_type: str, pix_key: str) -> bool:
+    """Botão de PIX nativo no chat — UazAPI /send/pix-button.
+    pix_type: CPF, CNPJ, PHONE, EMAIL ou EVP."""
+    bodyd = {"number": chatid, "pixName": pix_name, "pixType": pix_type, "pixKey": pix_key,
+             "delay": 2000, "readmessages": True}
+    return uazapi_post("/send/pix-button", bodyd)
+
 def react_msg(wa_msg_id: str, emoji: str = "👍") -> bool:
     """Reage a uma mensagem do lead com emoji (comportamento humano)."""
     if not wa_msg_id:
@@ -185,7 +200,7 @@ def react_msg(wa_msg_id: str, emoji: str = "👍") -> bool:
 
 POSITIVE_WORDS = ("sim", "ok", "fechado", "pode", "quero", "aceito", "bora", "vamos", "combinado")
 
-def send_whatsapp(chatid: str, text: str) -> bool:
+def send_whatsapp(chatid: str, text: str, replyid: str = "") -> bool:
     """Envio com trava de segurança (pós-incidente 17/09).
     DRY_RUN=1 (default): NENHUM envio real — tudo é redirecionado pro Hugo
     com prefixo [DRY-RUN]. Produção exige /admin/unlock com PROD_UNLOCK_KEY."""
@@ -210,8 +225,11 @@ def send_whatsapp(chatid: str, text: str) -> bool:
 
     # delay nativo UazAPI: mostra 'Digitando...' proporcional ao tamanho (humano digita ~40 chars/s)
     native_delay_ms = min(30000, 1500 + random.randint(0, 1000) + int(len(text) / 40 * 1000))
-    body = json.dumps({"number": target, "text": tag + text, "linkPreview": False,
-                       "delay": native_delay_ms, "readmessages": True}).encode("utf-8")
+    bodyd = {"number": target, "text": tag + text, "linkPreview": False,
+             "delay": native_delay_ms, "readmessages": True}
+    if replyid:
+        bodyd["replyid"] = replyid  # UazAPI cita a msg original nativamente
+    body = json.dumps(bodyd).encode("utf-8")
     req = urllib.request.Request(
         f"{UAZAPI_URL}/send/text", data=body,
         headers={"token": UAZAPI_TOKEN, "Content-Type": "application/json; charset=utf-8"})
@@ -282,6 +300,18 @@ def _process_inner(chatid: str, msg_id: str, text: str, wa_msg_id: str = ""):
     reply = hermes_respond(profile, chatid, text)
     last_reply_epoch[chatid] = time.time()
     crm_append(chatid, f"CLIENTE", text)
+    # intenção de compra → menu interativo de fechamento (além da resposta do closer)
+    FECH_WORDS = ("quero fechar", "como pago", "forma de pagamento", "fazer o pix",
+                  "mandar o pix", "aceito", "fechar", "contratar")
+    if profile == "closer" and any(w in low for w in FECH_WORDS):
+        human_pause(2.0, 4.0)
+        send_menu(chatid,
+                  "Fechamento — Rio Preto Tech",
+                  ["✅ Fechar com PIX (R$400)", "💳 Falar com o Hugo (pagamento/parcelamento)",
+                   "❓ Tenho outras dúvidas"],
+                  footer="Rio Preto Tech · 100% IA, supervisão humana")
+        crm_append(chatid, "MENU-FECHAMENTO", "menu de fechamento enviado")
+
     if reply:
         # escalação: responde ao cliente e notifica Hugo
         if reply.startswith("[ESCALADO]"):
@@ -289,7 +319,7 @@ def _process_inner(chatid: str, msg_id: str, text: str, wa_msg_id: str = ""):
             send_whatsapp(chatid, "Vou confirmar isso com a gente aqui e já te retorno! 🙏")
             send_whatsapp(HUGO_WA, f"⚠️ ESCALAÇÃO do {chatid}:\nCliente disse: {sanitize_text(text, 200)}\nMotivo: {motivo}")
         else:
-            send_whatsapp(chatid, reply)
+            send_whatsapp(chatid, reply, replyid=wa_msg_id)
         crm_append(chatid, f"{profile.upper()}", reply)
     else:
         crm_append(chatid, "SEM RESPOSTA (timeout)", "")
