@@ -158,6 +158,10 @@ def uazapi_post(path: str, body: dict) -> bool:
     except Exception:
         return False
 
+def human_pause(lo: float = 1.0, hi: float = 3.0):
+    """Pausa aleatória tipo humano (1-3s) antes de agir — ordem Hugo 24/09."""
+    time.sleep(random.uniform(lo, hi))
+
 def mark_read(wa_msg_ids: list):
     """Marca mensagens como lidas (check azul) — melhor esforço."""
     if wa_msg_ids:
@@ -169,6 +173,14 @@ def send_typing(chatid: str, delay_ms: int = 60000):
 
 def stop_typing(chatid: str):
     uazapi_post("/message/presence", {"number": chatid, "presence": "paused"})
+
+def react_msg(wa_msg_id: str, emoji: str = "👍") -> bool:
+    """Reage a uma mensagem do lead com emoji (comportamento humano)."""
+    if not wa_msg_id:
+        return False
+    return uazapi_post("/message/react", {"id": wa_msg_id, "text": emoji})
+
+POSITIVE_WORDS = ("sim", "ok", "fechado", "pode", "quero", "aceito", "bora", "vamos", "combinado")
 
 def send_whatsapp(chatid: str, text: str) -> bool:
     """Envio com trava de segurança (pós-incidente 17/09).
@@ -193,7 +205,10 @@ def send_whatsapp(chatid: str, text: str) -> bool:
         crm_append(chatid, "BLOQUEADO-DRYRUN", text[:100])
         return False
 
-    body = json.dumps({"number": target, "text": tag + text, "linkPreview": False}).encode("utf-8")
+    # delay nativo UazAPI: mostra 'Digitando...' proporcional ao tamanho (humano digita ~40 chars/s)
+    native_delay_ms = min(30000, 1500 + random.randint(0, 1000) + int(len(text) / 40 * 1000))
+    body = json.dumps({"number": target, "text": tag + text, "linkPreview": False,
+                       "delay": native_delay_ms, "readmessages": True}).encode("utf-8")
     req = urllib.request.Request(
         f"{UAZAPI_URL}/send/text", data=body,
         headers={"token": UAZAPI_TOKEN, "Content-Type": "application/json; charset=utf-8"})
@@ -210,9 +225,10 @@ def send_whatsapp(chatid: str, text: str) -> bool:
 # ---------- processamento ----------
 def process(chatid: str, msg_id: str, text: str, wa_msg_id: str = ""):
     try:
+        human_pause()  # 1-3s: humano não lê na hora
         mark_read([wa_msg_id] if wa_msg_id else [])
         send_typing(chatid)
-        _process_inner(chatid, msg_id, text)
+        _process_inner(chatid, msg_id, text, wa_msg_id)
     except Exception as e:
         import traceback, sys
         traceback.print_exc()
@@ -220,7 +236,7 @@ def process(chatid: str, msg_id: str, text: str, wa_msg_id: str = ""):
         stop_typing(chatid)
         crm_append(chatid, "ERRO-PROCESS", f"{e}")
 
-def _process_inner(chatid: str, msg_id: str, text: str):
+def _process_inner(chatid: str, msg_id: str, text: str, wa_msg_id: str = ""):
     profile = route_for(chatid)
     if profile == "treino-closer":
         # Modo treino: inicia com [TREINO] e PERMANECE ativo (memória de sessão)
@@ -256,6 +272,10 @@ def _process_inner(chatid: str, msg_id: str, text: str):
     if time.time() - last < QUEUE_COOLDOWN_S:
         pending_queue.append({"chatid": chatid, "msg": text, "profile": profile, "ts": time.time() + QUEUE_COOLDOWN_S})
         return
+    # reação humana: lead confirmou algo → 👍 na msg dele
+    low = text.lower()
+    if any(w in low for w in POSITIVE_WORDS) and len(text) < 60:
+        react_msg(wa_msg_id, "👍")
     reply = hermes_respond(profile, chatid, text)
     last_reply_epoch[chatid] = time.time()
     crm_append(chatid, f"CLIENTE", text)
