@@ -307,7 +307,7 @@ def _process_inner(chatid: str, msg_id: str, text: str, wa_msg_id: str = ""):
         human_pause(2.0, 4.0)
         send_menu(chatid,
                   "Fechamento — Rio Preto Tech",
-                  ["✅ Fechar com PIX (R$400)", "💳 Falar com o Hugo (pagamento/parcelamento)",
+                  ["✅ Fechar com PIX (sinal R$100)", "💳 Falar com o Hugo (pagamento/parcelamento)",
                    "❓ Tenho outras dúvidas"],
                   footer="Rio Preto Tech · 100% IA, supervisão humana")
         crm_append(chatid, "MENU-FECHAMENTO", "menu de fechamento enviado")
