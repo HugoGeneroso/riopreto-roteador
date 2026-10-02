@@ -258,6 +258,21 @@ def process(chatid: str, msg_id: str, text: str, wa_msg_id: str = ""):
         crm_append(chatid, "ERRO-PROCESS", f"{e}")
 
 def _process_inner(chatid: str, msg_id: str, text: str, wa_msg_id: str = ""):
+    # clique de botão do PITCH (02/10): responder na hora + spool p/ agente montar
+    # o prototipo — o vigia (scripts/watch_proto_clicks.py) tambem pega, este
+    # caminho da resposta automatica.
+    if text.startswith("[BOTÃO] proto_"):
+        human_pause(2.0, 5.0)
+        if "proto_sim" in text:
+            send_whatsapp(chatid, "Perfeito! Nossa equipe já está trabalhando no protótipo de um site pra vocês — te mando o link aqui mesmo quando ficar pronto (normalmente até o fim do dia). Se tiver fotos do negócio pra colocar nele, pode mandar junto.")
+            crm_append(chatid, "PROTO-CLICK-SIM", text)
+        elif "proto_depois" in text:
+            send_whatsapp(chatid, "Sem problema! O protótipo fica pronto do mesmo jeito e te mando o link — só olhar quando quiser.")
+            crm_append(chatid, "PROTO-CLICK-DEPOIS", text)
+        else:
+            send_whatsapp(chatid, "Tranquilo, sem insistência por aqui. Se um dia fizer sentido, é só chamar. Abraço!")
+            crm_append(chatid, "PROTO-FIM", text)
+        return
     profile = route_for(chatid)
     if profile == "treino-closer":
         # Modo treino: inicia com [TREINO] e PERMANECE ativo (memória de sessão)
@@ -408,6 +423,15 @@ async def webhook(request: Request):
                         or (m2.get("extendedTextMessage") or {}).get("text"))
             if not text:
                 text = _dig(data, "conversation", "text")
+        # clique de BOTÃO/LISTA (02/10, payload real capturado no teste c/ Hugo):
+        # EventType=messages, message.buttonOrListid=<id>, content.selectedID /
+        # selectedDisplayText. Sem isso o parser descarta o clique (sem "text").
+        if not text:
+            btn_id = str(msg.get("buttonOrListid") or data.get("buttonOrListid")
+                         or (content or {}).get("selectedID") or "")
+            if btn_id or isinstance(content, dict) and content.get("selectedDisplayText"):
+                disp = str((content or {}).get("selectedDisplayText") or btn_id)
+                text = f"[BOTÃO] {btn_id} :: {disp}"
         if not chatid or not text:
             continue
         text = sanitize_text(text)
