@@ -5,7 +5,7 @@ injeta no profile Hermes e devolve a resposta via uazapi_send.py.
 
 Deploy: Railway (FastAPI). Ver playbook/roteador-whatsapp-spec.md
 """
-import hashlib, hmac, json, os, re, subprocess, threading, time
+import hashlib, hmac, json, os, random, re, subprocess, threading, time
 from collections import deque
 from datetime import datetime
 from pathlib import Path
