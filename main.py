@@ -421,17 +421,19 @@ async def webhook(request: Request):
             if isinstance(m2, dict):
                 text = (m2.get("conversation")
                         or (m2.get("extendedTextMessage") or {}).get("text"))
-            if not text:
-                text = _dig(data, "conversation", "text")
-        # clique de BOTÃO/LISTA (02/10, payload real capturado no teste c/ Hugo):
+        # clique de BOTAO/LISTA (02/10, payload real capturado no teste c/ Hugo):
         # EventType=messages, message.buttonOrListid=<id>, content.selectedID /
-        # selectedDisplayText. Sem isso o parser descarta o clique (sem "text").
+        # selectedDisplayText. ANTES do _dig: o quotedMessage dentro de
+        # contextInfo contem o "text" da msg original citada — _dig roubaria
+        # esse texto e o clique viraria mensagem comum (bug visto no teste).
         if not text:
             btn_id = str(msg.get("buttonOrListid") or data.get("buttonOrListid")
                          or (content or {}).get("selectedID") or "")
             if btn_id or isinstance(content, dict) and content.get("selectedDisplayText"):
                 disp = str((content or {}).get("selectedDisplayText") or btn_id)
                 text = f"[BOTÃO] {btn_id} :: {disp}"
+        if not text:
+            text = _dig(data, "conversation", "text")
         if not chatid or not text:
             continue
         text = sanitize_text(text)
