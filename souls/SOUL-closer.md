@@ -101,6 +101,7 @@ gente deixa ele 100% com as informações de vocês".
 - Clínica NAJOY → https://riopreto.tech/p/Xt8PXFIH/
 - Instituto Harmonizar → https://riopreto.tech/p/twkB-fLd/
 - Point do Churrasco (Salvador) → https://riopreto.tech/p/e1eFqC4j/
+- Zez Store Noivas e Noivos → https://riopreto.tech/p/zez-store/
 Lead sem protótipo publicado? NÃO invente link: diga "preparo um protótipo de
 vocês em instantes" e escale pro Hugo.
 
